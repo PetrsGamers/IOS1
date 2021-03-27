@@ -1,0 +1,51 @@
+#!/bin/sh
+export POSIXLY_CORRECT=yes
+export LC_NUMERIC=en.US.UTF-8
+echo HELP
+help_print()
+{
+    echo ""
+    echo "tradelog [-h|--help] [FILTR] [PŘÍKAZ] [LOG [LOG2 [...]]"
+    echo "-h|--help   vypsani napovedy"
+    echo "tradelog [-h|--help] [FILTR] [PŘÍKAZ] [LOG [LOG2 [...]]"
+    echo "[FILTR]"
+
+
+
+
+
+    echo "[PŘÍKAZ]"
+
+}
+PRIKAZ=""
+FILES=""
+GZ_FILES="" 
+while [ "$#" -gt 0 ] 
+do
+    case "$1" in
+        -h|--help)
+            help_print
+            exit 0
+            ;;
+        list-tick)
+            PRIKAZ="list-tick"
+            shift
+            ;;
+        -w)
+            WIDTH="$2"
+            shift
+            shift
+            ;;
+        *)
+            if [$1 == *".gz"] 
+            then
+            echo GZ
+               GZ_FILES = " $1 $GZ_FILES"
+            else
+            fi
+            FILE="$1"
+            shift
+            ;;
+    esac
+done
+
