@@ -1,7 +1,6 @@
 #!/bin/sh
 export POSIXLY_CORRECT=yes
 export LC_NUMERIC=en.US.UTF-8
-echo HELP
 help_print()
 {
     echo ""
@@ -9,10 +8,6 @@ help_print()
     echo "-h|--help   vypsani napovedy"
     echo "tradelog [-h|--help] [FILTR] [PŘÍKAZ] [LOG [LOG2 [...]]"
     echo "[FILTR]"
-
-
-
-
 
     echo "[PŘÍKAZ]"
 
@@ -37,15 +32,33 @@ do
             shift
             ;;
         *)
-            if [$1 == *".gz"] 
-            then
-            echo GZ
-               GZ_FILES = " $1 $GZ_FILES"
-            else
-            fi
-            FILE="$1"
+            case "$1" in 
+                *.gz*)
+                    echo GZ
+                    GZ_FILES=" $1 $GZ_FILES"
+                     ;;
+                *)
+                echo "normal file"
+                FILES="$1 $FILES"
+            esac    
             shift
             ;;
     esac
 done
+if [ "$FILES" = "" ]; then  #pokud je neni zadany soubor cti z toho co ti zada
+    while read line
+    do
+    echo "$line"
+    done < "${1:-/dev/stdin}"   
+    exit 1
+else
+    value=$(cat $FILES)
+    echo "$value"
+fi
+
+
+
+echo "$PRIKAZ"
+echo "$FILES"
+echo "$GZ_FILES"
 
