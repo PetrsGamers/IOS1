@@ -12,10 +12,15 @@ help_print()
     echo "[PŘÍKAZ]"
 
 }
+#TODO HELP CELY
+#TODO HLAVICKU SOUBORU
 FILTR=""
-FILTRCOUNTER=0
+POCETTICKERU=0
 POCETSOUBORU=0
+POCETSOUBORUGZ=0
 COUNTERSOUBORU=0
+AFTERDATE="1000-01-01 01:01:01"
+BEFOREDATE="9999-12-31 23:59:59"
 PRIKAZ=""
 FILES=""
 GZ_FILES="" 
@@ -41,8 +46,8 @@ do
             ;;
         
         -t)
-            FILTR="$FILTR ticker $2"
-            FILTRCOUNTER=$(echo "$FILTRCOUNTER+1" | bc)
+            FILTR="$2 $FILTR"
+            POCETTICKERU=$(echo "$POCETTICKERU+1" | bc)
             shift
             shift
             ;;
@@ -50,40 +55,79 @@ do
             PRIKAZ="pos"
             shift
             ;;
+        -a)
+            AFTERDATE="$2 $3"
+            shift
+            shift
+            shift
+            ;;
+        -b)
+            BEFOREDATE="$2 $3"
+            shift
+            shift
+            shift
+            ;;
         *)
             case "$1" in 
                 *.gz*)
                     GZ_FILES="$1 $GZ_FILES"
                      ;;
-                *)
-                    
-                    FILES="$1" #pridat vic files
-                    POCETSOUBORU=$(echo "$POCETSOUBORU+1" | bc)
+                *) 
+                    FILES="$1 $FILES" #pridat vic files
             esac    
             shift
             ;;
     esac
 done
-NACTENYTEXT=""
-if [ "$FILES" = "" ]; then  #pokud je neni zadany soubor cti z toho co ti zada
-    while read -r line
-    do 
-    echo "$line"
-    done < "${1:-/dev/stdin}"   
-    exit 1 
+
+NACTENYTEXT=$(gzip -q -d -c $GZ_FILES | cat $FILES -) #nactenitextu i z zipu
+if [ "$POCETTICKERU" != "0" ] 
+then
+FILTRTEXT=$(echo "$NACTENYTEXT" | awk -F ';' -v ticker="$FILTR" -v pocettickeru="$POCETTICKERU" '
+{
+    split(ticker,b," ")
+    i = 1
+    while (i <= pocettickeru) {
+        if($2==b[i]){print $0}
+        i++
+    }
+
+    
+}'
+) 
+else
+    FILTRTEXT="$NACTENYTEXT"   
 fi
+# echo $AFTERDATE
+if [ "$AFTERDATE" != "1000-01-01 01:01:01" ]
+then
+FILTRTEXT=$(echo "$FILTRTEXT" | awk -F ';' -v afterdate="$AFTERDATE" '
+{
+    if($1>afterdate){print $0}  
+}'
+)
+fi
+# echo $BEFOREDATE
+if [ "$BEFOREDATE" != "9999-12-31 23:59:59" ]
+then
+FILTRTEXT=$(echo "$FILTRTEXT" | awk -F ';' -v beforedate="$BEFOREDATE" '
+{
+    if($1<beforedate){print $0}  
+}'
+)
+fi
+echo "$FILTRTEXT"
 
 
-# while [ "$POCETSOUBORU" != "$COUNTERSOUBORU" ] 
-# do
-# LIST TICK VYPIS
+#LIST TICK VYPIS
 TICKERS="" 
 if [ "$PRIKAZ" = "list-tick" ] 
 then
-    while IFS= read -r line; do
-        NEWTICKER=$(echo "$line" | cut -d ";" -f 2)
-        TICKERS="$NEWTICKER\n$TICKERS"
-    done < "$FILES"
+TICKERS=$(echo "$FILTRTEXT" | awk -F ';' '
+{
+    {print $2}  
+}'
+)  
     echo "$TICKERS" | sort -u 
 fi
 
@@ -93,53 +137,53 @@ fi
 
 
 
-# COUNTERSOUBORU=$(echo "$COUNTERSOUBORU+1" | bc)
-# echo $POCETSOUBORU
-# echo $COUNTERSOUBORU
+# # COUNTERSOUBORU=$(echo "$COUNTERSOUBORU+1" | bc)
+# # echo $POCETSOUBORU
+# # echo $COUNTERSOUBORU
 
 
 
 
 
-#PROFIT VYPIS
-SUMABUY=0
-SUMASELL=0
-if [ "$PRIKAZ" = "profit" ] 
-then
-    while IFS= read -r line; do
+# #PROFIT VYPIS
+# SUMABUY=0
+# SUMASELL=0
+# if [ "$PRIKAZ" = "profit" ] 
+# then
+#     while IFS= read -r line; do
 
-    case "$line" in 
-            *sell*)
-                HODNOTASELL=$(echo "$line" | cut -d ";" -f 4)
-                POCETAKCII=$(echo "$line" | cut -d ";" -f 6)
-                SUMASELL=$(echo "$SUMASELL+($HODNOTASELL*$POCETAKCII)" | bc)
-                ;;
-            *buy*)  
-                HODNOTABUY=$(echo "$line" | cut -d ";" -f 4)
-                POCETAKCII=$(echo "$line" | cut -d ";" -f 6)
-                SUMABUY=$(echo "$SUMABUY+($HODNOTABUY*$POCETAKCII)" | bc)
-                ;;         
-    esac
-    done < "$FILES"
-    echo "$SUMASELL-$SUMABUY" | bc
-fi
-#POSITION VYPIS
-if [ "$PRIKAZ" = "pos" ] 
-then
-    while IFS= read -r line; do
-        NEWTICKER=$(echo "$line" | cut -d ";" -f 2)
+#     case "$line" in 
+#             *sell*)
+#                 HODNOTASELL=$(echo "$line" | cut -d ";" -f 4)
+#                 POCETAKCII=$(echo "$line" | cut -d ";" -f 6)
+#                 SUMASELL=$(echo "$SUMASELL+($HODNOTASELL*$POCETAKCII)" | bc)
+#                 ;;
+#             *buy*)  
+#                 HODNOTABUY=$(echo "$line" | cut -d ";" -f 4)
+#                 POCETAKCII=$(echo "$line" | cut -d ";" -f 6)
+#                 SUMABUY=$(echo "$SUMABUY+($HODNOTABUY*$POCETAKCII)" | bc)
+#                 ;;         
+#     esac
+#     done < "$FILES"
+#     echo "$SUMASELL-$SUMABUY" | bc
+# fi
+# #POSITION VYPIS
+# if [ "$PRIKAZ" = "pos" ] 
+# then
+#     while IFS= read -r line; do
+#         NEWTICKER=$(echo "$line" | cut -d ";" -f 2)
 
-        POCETZNAKU=${#NEWTICKER} 
-        while [ "$POCETZNAKU" != "11" ] 
-        do
-          NEWTICKER="$NEWTICKER "
-          POCETZNAKU=$(echo "$POCETZNAKU+1" | bc)  
-        done
-        NEWTICKER="$NEWTICKER:\n$TICKERS"
-        TICKERS="$NEWTICKER:\n$TICKERS"
-    done < "$FILES"
-    echo "$TICKERS" 
-fi
+#         POCETZNAKU=${#NEWTICKER} 
+#         while [ "$POCETZNAKU" != "11" ] 
+#         do
+#           NEWTICKER="$NEWTICKER "
+#           POCETZNAKU=$(echo "$POCETZNAKU+1" | bc)  
+#         done
+#         NEWTICKER="$NEWTICKER:\n$TICKERS"
+#         TICKERS="$NEWTICKER:\n$TICKERS"
+#     done < "$FILES"
+#     echo "$TICKERS" 
+# fi
 
 
 
