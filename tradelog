@@ -16,9 +16,6 @@ help_print()
 #TODO HLAVICKU SOUBORU
 FILTR=""
 POCETTICKERU=0
-POCETSOUBORU=0
-POCETSOUBORUGZ=0
-COUNTERSOUBORU=0
 AFTERDATE="1000-01-01 01:01:01"
 BEFOREDATE="9999-12-31 23:59:59"
 PRIKAZ=""
@@ -53,6 +50,10 @@ do
             ;;
         pos)
             PRIKAZ="pos"
+            shift
+            ;;
+        last-price)
+            PRIKAZ="last-price"
             shift
             ;;
         -a)
@@ -90,9 +91,7 @@ FILTRTEXT=$(echo "$NACTENYTEXT" | awk -F ';' -v ticker="$FILTR" -v pocettickeru=
     while (i <= pocettickeru) {
         if($2==b[i]){print $0}
         i++
-    }
-
-    
+    } 
 }'
 ) 
 else
@@ -116,8 +115,10 @@ FILTRTEXT=$(echo "$FILTRTEXT" | awk -F ';' -v beforedate="$BEFOREDATE" '
 }'
 )
 fi
+if [ "$PRIKAZ" = "" ] 
+then
 echo "$FILTRTEXT"
-
+fi
 
 #LIST TICK VYPIS
 TICKERS="" 
@@ -131,63 +132,129 @@ TICKERS=$(echo "$FILTRTEXT" | awk -F ';' '
     echo "$TICKERS" | sort -u 
 fi
 
+#PROFIT VYPIS
+SUMABUY=0
+SUMASELL=0
+if [ "$PRIKAZ" = "profit" ] 
+then
+   SUMASELL=$(echo "$FILTRTEXT" | awk -F ';' '
+{
+    hodnota=0
+    if($3=="sell"){
+        hodnota=$4*$6
+        printf "%.2f ", hodnota
+    }
+    
+}'
+)
+SUMASELL=$(echo "$SUMASELL" | tr ' ' + )
+SUMASELL=$(echo "$SUMASELL" | sed 's/.$//')
+SUMASELL=$(echo "$SUMASELL" | bc )
+SUMABUY=$(echo "$FILTRTEXT" | awk -F ';' -v hodnota=0 '
+{
+    hodnota=0
+    if($3=="buy"){
+        hodnota=$4*$6
+        printf "%.2f ", hodnota
+    }
+    
+}'
+)
+SUMABUY=$(echo "$SUMABUY" | tr ' ' + )
+SUMABUY=$(echo "$SUMABUY" | sed 's/.$//')
+SUMABUY=$(echo "$SUMABUY" | bc )
+echo "$SUMASELL-$SUMABUY" | bc
+fi  
 
 
 
-
-
-
-# # COUNTERSOUBORU=$(echo "$COUNTERSOUBORU+1" | bc)
-# # echo $POCETSOUBORU
-# # echo $COUNTERSOUBORU
-
-
-
-
-
-# #PROFIT VYPIS
-# SUMABUY=0
-# SUMASELL=0
-# if [ "$PRIKAZ" = "profit" ] 
-# then
-#     while IFS= read -r line; do
-
-#     case "$line" in 
-#             *sell*)
-#                 HODNOTASELL=$(echo "$line" | cut -d ";" -f 4)
-#                 POCETAKCII=$(echo "$line" | cut -d ";" -f 6)
-#                 SUMASELL=$(echo "$SUMASELL+($HODNOTASELL*$POCETAKCII)" | bc)
-#                 ;;
-#             *buy*)  
-#                 HODNOTABUY=$(echo "$line" | cut -d ";" -f 4)
-#                 POCETAKCII=$(echo "$line" | cut -d ";" -f 6)
-#                 SUMABUY=$(echo "$SUMABUY+($HODNOTABUY*$POCETAKCII)" | bc)
-#                 ;;         
-#     esac
-#     done < "$FILES"
-#     echo "$SUMASELL-$SUMABUY" | bc
-# fi
 # #POSITION VYPIS
-# if [ "$PRIKAZ" = "pos" ] 
-# then
-#     while IFS= read -r line; do
-#         NEWTICKER=$(echo "$line" | cut -d ";" -f 2)
 
-#         POCETZNAKU=${#NEWTICKER} 
-#         while [ "$POCETZNAKU" != "11" ] 
-#         do
-#           NEWTICKER="$NEWTICKER "
-#           POCETZNAKU=$(echo "$POCETZNAKU+1" | bc)  
-#         done
-#         NEWTICKER="$NEWTICKER:\n$TICKERS"
-#         TICKERS="$NEWTICKER:\n$TICKERS"
-#     done < "$FILES"
-#     echo "$TICKERS" 
-# fi
+if [ "$PRIKAZ" = "pos" ] 
+then
+FILTRTEXT=$(echo "$FILTRTEXT" | awk -F ';' '
+{
+   if($3=="buy")   
+   {
+       objem[$2]+=$6 
+       }  
+    if($3=="sell")   
+   {
+       objem[$2]-=$6 
+       }
+    poslednihodnota[$2]=$4
+    }
+    
+    END {
+    for(ticker in objem)
+    {
+        value=objem[ticker]*poslednihodnota[ticker]
+        printf("%.2f %s\n", value,ticker)
+    }
+}'
+)
+FILTRTEXT=$(echo "$FILTRTEXT" | sort -n -r)
+NEJDELSICISLO=$( echo "$FILTRTEXT" | awk -F ' ' '
+{
+    cislo=$1
+    if(length(cislo)>nejdelsicislo)
+    {
+        nejdelsicislo=length(cislo)
+    }
+    }
+    END{
+        print nejdelsicislo
 
+}'
+)
+echo "$NEJDELSICISLO"
+FILTRTEXT=$(echo "$FILTRTEXT" | awk -F ' ' -v nejdelsicislo="$NEJDELSICISLO" '
+{
+    printf("%10-s: %*.2f\n", $2,nejdelsicislo,$1)
+}'
+)
 
+echo "$FILTRTEXT"
+fi
+##LAST PRICE VYPIS
+if [ "$PRIKAZ" = "last-price" ] 
+then
+FILTRTEXT=$(echo "$FILTRTEXT" | awk -F ';' '
+{
+    
+    poslednihodnota[$2]=$4
+    }
+    END {
+    for(ticker in poslednihodnota)
+    {
+        printf("%s %.2f\n",ticker, poslednihodnota[ticker])
+    }
+}'
+)
+FILTRTEXT=$(echo "$FILTRTEXT" | sort)
 
-# done
+NEJDELSICISLO=$( echo "$FILTRTEXT" | awk -F ' ' '
+{
+    cislo=$2
+    if(length(cislo)>nejdelsicislo)
+    {
+        nejdelsicislo=length(cislo)
+    }
+    }
+    END{
+        print nejdelsicislo
+
+}'
+)
+echo "$NEJDELSICISLO"
+FILTRTEXT=$(echo "$FILTRTEXT" | awk -F ' ' -v nejdelsicislo="$NEJDELSICISLO" '
+{
+    printf("%10-s: %*.2f\n", $1,nejdelsicislo,$2)
+}'
+)
+echo "$FILTRTEXT"
+fi
+
 echo "PRIKAZ $PRIKAZ"
 echo "SOUBORY $FILES"
 echo "GZ SOUBORY $GZ_FILES"
