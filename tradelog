@@ -1,4 +1,9 @@
 #!/bin/sh
+#####################################################
+################### Projekt č.1 #####################
+###################  Tradelog #######################
+################## Petr Hýbl ########################
+##################  4.4.2021 ########################
 export POSIXLY_CORRECT=yes
 export LC_NUMERIC=en.US.UTF-8
 help_print()
@@ -8,12 +13,23 @@ help_print()
     echo "-h|--help   vypsani napovedy"
     echo "tradelog [-h|--help] [FILTR] [PŘÍKAZ] [LOG [LOG2 [...]]"
     echo "[FILTR]"
-
+    echo "-a DATETIME    zaznamy po tomto datu format YYYY-MM-DD HH:MM:SS"
+    echo "-b DATETIME    zaznamy pred timto datem format YYYY-MM-DD HH:MM:SS"
+    echo "-t TICKER      pouze zaznamy s promennou TICKER, lze zadat vice"
+    echo "-w WIDTH       nastavuje sirku WIDTH pro prikazy graph-pos a hist-ord, musi byt kladne cele cislo"
     echo "[PŘÍKAZ]"
+    echo "list-tick      vypis vsech tickeru v zaznamu"
+    echo "profit         vypis celkoveho zisku uzavrenych pozic"
+    echo "pos            vypis hodnot aktualne drzenych pozic "
+    echo "last-price     vypis posledni zname ceny pro kazdy ticker"
+    echo "hist-ord       vypis histogramu poctu transakci dle tickeru"
+    echo "graph-pos      vypis grafu hodnot drzenych pozic dle tickeru"
+    echo "[LOG [LOG2 [...]]"
+    echo "soubory ze kterych se budou cist logy transakci"
 
 }
-#TODO HELP CELY
-#TODO HLAVICKU SOUBORU
+
+
 FILTR=""
 POCETTICKERU=0
 AFTERDATE="1000-01-01 01:01:01"
@@ -21,6 +37,7 @@ BEFOREDATE="9999-12-31 23:59:59"
 PRIKAZ=""
 FILES=""
 GZ_FILES="" 
+WIDTH="0"
 while [ "$#" -gt 0 ] 
 do
     case "$1" in
@@ -57,31 +74,60 @@ do
             shift
             ;;
         -a)
-            AFTERDATE="$2 $3"
-            shift
+            AFTERDATE="$2"
             shift
             shift
             ;;
         -b)
-            BEFOREDATE="$2 $3"
-            shift
+            BEFOREDATE="$2"
             shift
             shift
             ;;
+        hist-ord)
+            PRIKAZ="hist-ord"
+            shift
+            ;;
+        graph-pos)
+            PRIKAZ="graph-pos"
+            shift
+            ;;         
         *)
             case "$1" in 
                 *.gz*)
-                    GZ_FILES="$1 $GZ_FILES"
+                    GZ_FILES="$GZ_FILES $1"
                      ;;
                 *) 
-                    FILES="$1 $FILES" #pridat vic files
+                    FILES="$FILES $1" #pridat vic files
             esac    
             shift
             ;;
     esac
 done
+if  [ "$PRIKAZ" = "graph-pos" ] &&  [ "$WIDTH" = "0" ]
+then
+    WIDTH="default"
+fi
 
-NACTENYTEXT=$(gzip -q -d -c $GZ_FILES | cat $FILES -) #nactenitextu i z zipu
+if [ "$FILES" = "" ] && [ "$GZ_FILES" = "" ]; then  #pokud je neni zadany soubor cti z toho co ti zada
+    while read -r line
+    do
+    NACTENYTEXT=$(echo "$NACTENYTEXT" | awk -F ';' -v line="$line" '
+    {
+            if($0!="")
+            print $0
+            }
+            END {
+                    print line
+    }'
+)
+    done 
+else
+  NACTENYTEXT=$(gzip -q -d -c $GZ_FILES | cat $FILES -)   #nactenitextu i z zipu
+fi   
+ 
+
+
+                                                            
 if [ "$POCETTICKERU" != "0" ] 
 then
 FILTRTEXT=$(echo "$NACTENYTEXT" | awk -F ';' -v ticker="$FILTR" -v pocettickeru="$POCETTICKERU" '
@@ -97,16 +143,16 @@ FILTRTEXT=$(echo "$NACTENYTEXT" | awk -F ';' -v ticker="$FILTR" -v pocettickeru=
 else
     FILTRTEXT="$NACTENYTEXT"   
 fi
-# echo $AFTERDATE
+
 if [ "$AFTERDATE" != "1000-01-01 01:01:01" ]
 then
 FILTRTEXT=$(echo "$FILTRTEXT" | awk -F ';' -v afterdate="$AFTERDATE" '
 {
     if($1>afterdate){print $0}  
+
 }'
 )
 fi
-# echo $BEFOREDATE
 if [ "$BEFOREDATE" != "9999-12-31 23:59:59" ]
 then
 FILTRTEXT=$(echo "$FILTRTEXT" | awk -F ';' -v beforedate="$BEFOREDATE" '
@@ -120,7 +166,7 @@ then
 echo "$FILTRTEXT"
 fi
 
-#LIST TICK VYPIS
+# LIST TICK VYPIS
 TICKERS="" 
 if [ "$PRIKAZ" = "list-tick" ] 
 then
@@ -132,11 +178,16 @@ TICKERS=$(echo "$FILTRTEXT" | awk -F ';' '
     echo "$TICKERS" | sort -u 
 fi
 
-#PROFIT VYPIS
+# PROFIT VYPIS
 SUMABUY=0
 SUMASELL=0
 if [ "$PRIKAZ" = "profit" ] 
 then
+if  [ "$FILTRTEXT" = "" ]
+then
+    echo "0.00"
+
+else
    SUMASELL=$(echo "$FILTRTEXT" | awk -F ';' '
 {
     hodnota=0
@@ -147,6 +198,7 @@ then
     
 }'
 )
+
 SUMASELL=$(echo "$SUMASELL" | tr ' ' + )
 SUMASELL=$(echo "$SUMASELL" | sed 's/.$//')
 SUMASELL=$(echo "$SUMASELL" | bc )
@@ -164,11 +216,12 @@ SUMABUY=$(echo "$SUMABUY" | tr ' ' + )
 SUMABUY=$(echo "$SUMABUY" | sed 's/.$//')
 SUMABUY=$(echo "$SUMABUY" | bc )
 echo "$SUMASELL-$SUMABUY" | bc
+fi
 fi  
 
 
 
-# #POSITION VYPIS
+# POSITION VYPIS
 
 if [ "$PRIKAZ" = "pos" ] 
 then
@@ -194,7 +247,7 @@ FILTRTEXT=$(echo "$FILTRTEXT" | awk -F ';' '
 }'
 )
 FILTRTEXT=$(echo "$FILTRTEXT" | sort -n -r)
-NEJDELSICISLO=$( echo "$FILTRTEXT" | awk -F ' ' '
+NEJDELSICISLO=$(echo "$FILTRTEXT" | awk -F ' ' '
 {
     cislo=$1
     if(length(cislo)>nejdelsicislo)
@@ -207,7 +260,6 @@ NEJDELSICISLO=$( echo "$FILTRTEXT" | awk -F ' ' '
 
 }'
 )
-echo "$NEJDELSICISLO"
 FILTRTEXT=$(echo "$FILTRTEXT" | awk -F ' ' -v nejdelsicislo="$NEJDELSICISLO" '
 {
     printf("%10-s: %*.2f\n", $2,nejdelsicislo,$1)
@@ -246,7 +298,6 @@ NEJDELSICISLO=$( echo "$FILTRTEXT" | awk -F ' ' '
 
 }'
 )
-echo "$NEJDELSICISLO"
 FILTRTEXT=$(echo "$FILTRTEXT" | awk -F ' ' -v nejdelsicislo="$NEJDELSICISLO" '
 {
     printf("%10-s: %*.2f\n", $1,nejdelsicislo,$2)
@@ -254,9 +305,190 @@ FILTRTEXT=$(echo "$FILTRTEXT" | awk -F ' ' -v nejdelsicislo="$NEJDELSICISLO" '
 )
 echo "$FILTRTEXT"
 fi
+# HISTO 
 
-echo "PRIKAZ $PRIKAZ"
-echo "SOUBORY $FILES"
-echo "GZ SOUBORY $GZ_FILES"
-echo "FILTER $FILTR $FILTRCOUNTER"
+if [ "$PRIKAZ" = "hist-ord" ] 
+then
+if [ "$WIDTH" = "0" ] 
+then
+FILTRTEXT=$(echo "$FILTRTEXT" | awk -F ';' '
+{
+    pocetransakci[$2]=pocetransakci[$2]+1
+    }
+    END {
+    for(ticker in pocetransakci)
+    {
+        printf("%s ",ticker, pocetransakci[ticker])
+        for (i = 0; i < pocetransakci[ticker]; i++)
+        printf("#")
+        printf("\n")
+    }
+}'
+)
+FILTRTEXT=$(echo "$FILTRTEXT" | sort)
+FILTRTEXT=$(echo "$FILTRTEXT" | awk -F ' ' '
+{
+    printf("%10-s: %s\n", $1,$2)
+}'
+)
+echo "$FILTRTEXT"    
+else
+    FILTRTEXT=$(echo "$FILTRTEXT" | awk -F ';' '
+{
+    pocetransakci[$2]=pocetransakci[$2]+1
+    }
+    END {
+    for(ticker in pocetransakci)
+    {
+        printf("%s %d \n",ticker, pocetransakci[ticker])
+
+    }
+}'
+)
+
+NEJVETSITRANSAKCE=$(echo "$FILTRTEXT" | awk -F ' ' -v number=0 '
+{
+    if(number<$2)
+    {
+        number=$2
+    }
+    }
+    END {
+    print number 
+    }'
+)
+# echo "$NEJVETSITRANSAKCE"
+NASOBIC=$WIDTH/$NEJVETSITRANSAKCE
+NASOBIC=$(echo "$NASOBIC" | bc -l )
+# echo "$NASOBIC"
+FILTRTEXT=$(echo "$FILTRTEXT" | awk -F ' ' -v nasobic=$NASOBIC '
+{
+    
+    pocettransakci=nasobic*$2
+    printf("%10-s: ",$1)
+    for (i = 1; i <= pocettransakci; i++)
+    printf("#")
+    printf("\n")
+}'
+)
+FILTRTEXT=$(echo "$FILTRTEXT" | sort)
+echo "$FILTRTEXT"
+fi
+fi
+
+
+
+
+#GRAF
+if [ "$PRIKAZ" = "graph-pos" ] 
+then
+
+FILTRTEXT=$(echo "$FILTRTEXT" | awk -F ';' '
+{
+   if($3=="buy")   
+   {
+       objem[$2]+=$6 
+       }  
+    if($3=="sell")   
+   {
+       objem[$2]-=$6 
+       }
+    poslednihodnota[$2]=$4
+    }
+    
+    END {
+    for(ticker in objem)
+    {
+        value=objem[ticker]*poslednihodnota[ticker]
+        printf("%s %.2f \n", ticker, value)
+    }
+}'
+)
+
+FILTRTEXT=$(echo "$FILTRTEXT" | sort)
+if [ "$WIDTH" != "default" ]
+then
+NEJVETSICISLO=$(echo "$FILTRTEXT" | awk -F ' ' -v number=0 '
+{
+    hodnota=$2
+    if($2<0)
+    {
+        hodnota=$2*(-1)
+
+    }
+    if(nejnumber<hodnota)
+    {
+        nejnumber=hodnota
+    }
+    }
+    END {
+    printf("%f",nejnumber)  
+    }'
+)
+NASOBIC=$NEJVETSICISLO/$WIDTH
+NASOBIC=$(echo "$NASOBIC" | bc -l )
+FILTRTEXT=$(echo "$FILTRTEXT" | awk -F ' ' -v nasobic="$NASOBIC" '
+{
+   if($2>0)
+   {
+       znak="#"
+       hodnota=$2
+   }
+   if($2<0)
+   {
+       znak="!"
+       hodnota=$2*(-1)
+   }
+    printf("%10-s:",$1)
+    for (i = nasobic; i <= hodnota; i=i+nasobic)
+    {
+        if(i==nasobic)
+        {
+            printf(" ")
+        }
+        printf("%s",znak)
+
+    }
+
+    printf("\n")
+
+}'
+)
+echo "$FILTRTEXT"
+else
+
+FILTRTEXT=$(echo "$FILTRTEXT" | awk -F ' ' -v nasobic=1000 '
+{
+       if($2>0)
+   {
+       znak="#"
+       hodnota=$2
+   }
+   if($2<0)
+   {
+       znak="!"
+       hodnota=$2*(-1)
+   }
+    printf("%10-s:",$1)
+    for (i = nasobic; i <= hodnota; i=i+nasobic)
+    {
+        if(i==nasobic)
+        {
+            printf(" ")
+        }
+        printf("%s",znak)
+
+    }
+    printf("\n")
+}'
+)
+echo "$FILTRTEXT"
+fi
+fi
+# echo "PRIKAZ $PRIKAZ"
+# echo "SOUBORY $FILES"
+# echo "GZ SOUBORY $GZ_FILES"
+# echo "FILTER $FILTR $FILTRCOUNTER"
+# echo "WIDTH $WIDTH "
+# echo "-a $AFTERDATE  -B $BEFOREDATE"
 
