@@ -38,7 +38,7 @@ PRIKAZ=""
 FILES=""
 GZ_FILES="" 
 WIDTH="0"
-while [ "$#" -gt 0 ] 
+while [ "$#" -gt 0 ]  ## kontrola parametru a zapamatovani si jich do promennych
 do
     case "$1" in
         -h|--help)
@@ -105,20 +105,20 @@ do
 done
 if  [ "$PRIKAZ" = "graph-pos" ] &&  [ "$WIDTH" = "0" ]
 then
-    WIDTH="default"
+    WIDTH="default" # pokud nebude parametr nastavice specialni
 fi
 
 if [ "$FILES" = "" ] && [ "$GZ_FILES" = "" ]; then  #pokud je neni zadany soubor cti z toho co ti zada
     while read -r line
     do
-    NACTENYTEXT=$(echo "$NACTENYTEXT" | awk -F ';' -v line="$line" '
+    NACTENYTEXT=$(echo "$NACTENYTEXT" | awk -F ';' -v line="$line" ' 
     {
             if($0!="")
             print $0
             }
             END {
                     print line
-    }'
+    }' ##nacitani ze stdiin
 )
     done 
 else
@@ -128,29 +128,29 @@ fi
 
 
                                                             
-if [ "$POCETTICKERU" != "0" ] 
+if [ "$POCETTICKERU" != "0" ]  #FILTRACE TICKERU
 then
 FILTRTEXT=$(echo "$NACTENYTEXT" | awk -F ';' -v ticker="$FILTR" -v pocettickeru="$POCETTICKERU" '
 {
     split(ticker,b," ")
     i = 1
-    while (i <= pocettickeru) {
+    while (i <= pocettickeru) { 
         if($2==b[i]){print $0}
         i++
     } 
-}'
+}' #postupne nacitani radku pouze s tickerem ktery potrebujeme
 ) 
 else
-    FILTRTEXT="$NACTENYTEXT"   
+    FILTRTEXT="$NACTENYTEXT"   #pokud neni zadany prekopirujeme cely seznam
 fi
 
-if [ "$AFTERDATE" != "1000-01-01 01:01:01" ]
+if [ "$AFTERDATE" != "1000-01-01 01:01:01" ] 
 then
 FILTRTEXT=$(echo "$FILTRTEXT" | awk -F ';' -v afterdate="$AFTERDATE" '
 {
     if($1>afterdate){print $0}  
 
-}'
+}' #filtrace datumu
 )
 fi
 if [ "$BEFOREDATE" != "9999-12-31 23:59:59" ]
@@ -159,9 +159,9 @@ FILTRTEXT=$(echo "$FILTRTEXT" | awk -F ';' -v beforedate="$BEFOREDATE" '
 {
     if($1<beforedate){print $0}  
 }'
-)
+) #filtrace datumu
 fi
-if [ "$PRIKAZ" = "" ] 
+if [ "$PRIKAZ" = "" ]  # pokud neni zadany prikaz zobraz cely text
 then
 echo "$FILTRTEXT"
 fi
@@ -175,7 +175,7 @@ TICKERS=$(echo "$FILTRTEXT" | awk -F ';' '
     {print $2}  
 }'
 )  
-    echo "$TICKERS" | sort -u 
+    echo "$TICKERS" | sort -u  # vypisovani pouze TICKERU, sort- abecedne
 fi
 
 # PROFIT VYPIS
@@ -183,7 +183,7 @@ SUMABUY=0
 SUMASELL=0
 if [ "$PRIKAZ" = "profit" ] 
 then
-if  [ "$FILTRTEXT" = "" ]
+if  [ "$FILTRTEXT" = "" ] #pokud neni text rovnou vypis nulu
 then
     echo "0.00"
 
@@ -198,10 +198,10 @@ else
     
 }'
 )
-
-SUMASELL=$(echo "$SUMASELL" | tr ' ' + )
-SUMASELL=$(echo "$SUMASELL" | sed 's/.$//')
-SUMASELL=$(echo "$SUMASELL" | bc )
+# pocitame postupne hodnoty sell
+SUMASELL=$(echo "$SUMASELL" | tr ' ' + ) #nahrazeni pluska místo mezery
+SUMASELL=$(echo "$SUMASELL" | sed 's/.$//') # odebrani posledniho +
+SUMASELL=$(echo "$SUMASELL" | bc ) #vypocitani vyrazu
 SUMABUY=$(echo "$FILTRTEXT" | awk -F ';' -v hodnota=0 '
 {
     hodnota=0
@@ -211,11 +211,11 @@ SUMABUY=$(echo "$FILTRTEXT" | awk -F ';' -v hodnota=0 '
     }
     
 }'
-)
-SUMABUY=$(echo "$SUMABUY" | tr ' ' + )
-SUMABUY=$(echo "$SUMABUY" | sed 's/.$//')
-SUMABUY=$(echo "$SUMABUY" | bc )
-echo "$SUMASELL-$SUMABUY" | bc
+) # pocitame postupne hodnoty sell
+SUMABUY=$(echo "$SUMABUY" | tr ' ' + ) #nahrazeni pluska místo mezery
+SUMABUY=$(echo "$SUMABUY" | sed 's/.$//') # odebrani posledniho +
+SUMABUY=$(echo "$SUMABUY" | bc ) #vypocitani vyrazu
+echo "$SUMASELL-$SUMABUY" | bc #spocitani celkoveho profitu
 fi
 fi  
 
@@ -245,8 +245,8 @@ FILTRTEXT=$(echo "$FILTRTEXT" | awk -F ';' '
         printf("%.2f %s\n", value,ticker)
     }
 }'
-)
-FILTRTEXT=$(echo "$FILTRTEXT" | sort -n -r)
+) #vypocitani aktualni pozice pro kazdy ticker
+FILTRTEXT=$(echo "$FILTRTEXT" | sort -n -r) #serazeni podle cisel
 NEJDELSICISLO=$(echo "$FILTRTEXT" | awk -F ' ' '
 {
     cislo=$1
@@ -259,12 +259,12 @@ NEJDELSICISLO=$(echo "$FILTRTEXT" | awk -F ' ' '
         print nejdelsicislo
 
 }'
-)
+) #vypocitani nejdelsiho cisla
 FILTRTEXT=$(echo "$FILTRTEXT" | awk -F ' ' -v nejdelsicislo="$NEJDELSICISLO" '
 {
     printf("%10-s: %*.2f\n", $2,nejdelsicislo,$1)
 }'
-)
+) #vypsani cisel se zarovnanim
 
 echo "$FILTRTEXT"
 fi
@@ -282,8 +282,8 @@ FILTRTEXT=$(echo "$FILTRTEXT" | awk -F ';' '
         printf("%s %.2f\n",ticker, poslednihodnota[ticker])
     }
 }'
-)
-FILTRTEXT=$(echo "$FILTRTEXT" | sort)
+) #vypsani posledni hodnoty pro kazdy ticker
+FILTRTEXT=$(echo "$FILTRTEXT" | sort) #serazeni abecedne
 
 NEJDELSICISLO=$( echo "$FILTRTEXT" | awk -F ' ' '
 {
@@ -297,16 +297,16 @@ NEJDELSICISLO=$( echo "$FILTRTEXT" | awk -F ' ' '
         print nejdelsicislo
 
 }'
-)
+) #vypocitani nejdelsiho cisla
 FILTRTEXT=$(echo "$FILTRTEXT" | awk -F ' ' -v nejdelsicislo="$NEJDELSICISLO" '
 {
     printf("%10-s: %*.2f\n", $1,nejdelsicislo,$2)
 }'
-)
+) # zarovnany vypis
 echo "$FILTRTEXT"
 fi
-# HISTO 
 
+# HIST-ORD 
 if [ "$PRIKAZ" = "hist-ord" ] 
 then
 if [ "$WIDTH" = "0" ] 
@@ -324,13 +324,13 @@ FILTRTEXT=$(echo "$FILTRTEXT" | awk -F ';' '
         printf("\n")
     }
 }'
-)
+) # scitani poctu transakci pote za kazdou transakci napise hastag
 FILTRTEXT=$(echo "$FILTRTEXT" | sort)
 FILTRTEXT=$(echo "$FILTRTEXT" | awk -F ' ' '
 {
     printf("%10-s: %s\n", $1,$2)
 }'
-)
+) # zarovnani
 echo "$FILTRTEXT"    
 else
     FILTRTEXT=$(echo "$FILTRTEXT" | awk -F ';' '
@@ -344,7 +344,7 @@ else
 
     }
 }'
-)
+) #vypocitani poctu transakci pro kazdy ticker
 
 NEJVETSITRANSAKCE=$(echo "$FILTRTEXT" | awk -F ' ' -v number=0 '
 {
@@ -357,10 +357,10 @@ NEJVETSITRANSAKCE=$(echo "$FILTRTEXT" | awk -F ' ' -v number=0 '
     print number 
     }'
 )
-# echo "$NEJVETSITRANSAKCE"
+# spocitani nejvetsiho cisla
 NASOBIC=$WIDTH/$NEJVETSITRANSAKCE
-NASOBIC=$(echo "$NASOBIC" | bc -l )
-# echo "$NASOBIC"
+NASOBIC=$(echo "$NASOBIC" | bc -l ) # prepocitani jakou hodnotu bude mít jeden hashtag
+
 FILTRTEXT=$(echo "$FILTRTEXT" | awk -F ' ' -v nasobic=$NASOBIC '
 {
     
@@ -370,16 +370,13 @@ FILTRTEXT=$(echo "$FILTRTEXT" | awk -F ' ' -v nasobic=$NASOBIC '
     printf("#")
     printf("\n")
 }'
-)
+) #pocettransakci vynasobim nasobicem hodnot abych zjistil celkovy pocet hastagu
 FILTRTEXT=$(echo "$FILTRTEXT" | sort)
 echo "$FILTRTEXT"
 fi
 fi
 
-
-
-
-#GRAF
+#GRAF-POS
 if [ "$PRIKAZ" = "graph-pos" ] 
 then
 
@@ -404,8 +401,8 @@ FILTRTEXT=$(echo "$FILTRTEXT" | awk -F ';' '
     }
 }'
 )
-
-FILTRTEXT=$(echo "$FILTRTEXT" | sort)
+#vypocitani profitu
+FILTRTEXT=$(echo "$FILTRTEXT" | sort) #serazeni
 if [ "$WIDTH" != "default" ]
 then
 NEJVETSICISLO=$(echo "$FILTRTEXT" | awk -F ' ' -v number=0 '
@@ -425,6 +422,7 @@ NEJVETSICISLO=$(echo "$FILTRTEXT" | awk -F ' ' -v number=0 '
     printf("%f",nejnumber)  
     }'
 )
+#hledani absolutni hodnoty nejvetsiho cisla 
 NASOBIC=$NEJVETSICISLO/$WIDTH
 NASOBIC=$(echo "$NASOBIC" | bc -l )
 FILTRTEXT=$(echo "$FILTRTEXT" | awk -F ' ' -v nasobic="$NASOBIC" '
@@ -453,10 +451,10 @@ FILTRTEXT=$(echo "$FILTRTEXT" | awk -F ' ' -v nasobic="$NASOBIC" '
     printf("\n")
 
 }'
-)
+) #vypis ! nebo # pro velikost cisla profitu
 echo "$FILTRTEXT"
 else
-
+#bez width je nasobic 1000 jedna hodnota znaku = 1000
 FILTRTEXT=$(echo "$FILTRTEXT" | awk -F ' ' -v nasobic=1000 '
 {
        if($2>0)
@@ -485,10 +483,4 @@ FILTRTEXT=$(echo "$FILTRTEXT" | awk -F ' ' -v nasobic=1000 '
 echo "$FILTRTEXT"
 fi
 fi
-# echo "PRIKAZ $PRIKAZ"
-# echo "SOUBORY $FILES"
-# echo "GZ SOUBORY $GZ_FILES"
-# echo "FILTER $FILTR $FILTRCOUNTER"
-# echo "WIDTH $WIDTH "
-# echo "-a $AFTERDATE  -B $BEFOREDATE"
 
