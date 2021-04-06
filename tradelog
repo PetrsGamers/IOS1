@@ -38,6 +38,7 @@ PRIKAZ=""
 FILES=""
 GZ_FILES="" 
 WIDTH="0"
+NULA="0"
 WIDTHCOUNTER="0"
 while [ "$#" -gt 0 ]  ## kontrola parametru a zapamatovani si jich do promennych
 do
@@ -52,6 +53,11 @@ do
             ;;
         -w)
             
+            if [ "$NULA" -gt "$2" ]
+            then
+            echo CHYBA
+            exit 1
+            fi
             if [ "$WIDTHCOUNTER" = "1" ]
             then
             echo CHYBA
