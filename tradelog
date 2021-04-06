@@ -38,6 +38,7 @@ PRIKAZ=""
 FILES=""
 GZ_FILES="" 
 WIDTH="0"
+WIDTHCOUNTER="0"
 while [ "$#" -gt 0 ]  ## kontrola parametru a zapamatovani si jich do promennych
 do
     case "$1" in
@@ -50,7 +51,14 @@ do
             shift
             ;;
         -w)
+            
+            if [ "$WIDTHCOUNTER" = "1" ]
+            then
+            echo CHYBA
+            exit 1
+            fi
             WIDTH="$2"
+            WIDTHCOUNTER=$(echo "$WIDTHCOUNTER+1" | bc)
             shift
             shift
             ;;
