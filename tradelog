@@ -136,11 +136,22 @@ if [ "$FILES" = "" ] && [ "$GZ_FILES" = "" ]; then  #pokud je neni zadany soubor
 )
     done 
 else
-  NACTENYTEXT=$(gzip -q -d -c $GZ_FILES | cat $FILES -)   #nactenitextu i z zipu
+  if [ "$GZ_FILES" != "" ]; then
+        if [ "$FILES" != "" ]; then
+                FILTRTEXT=$(eval gzip -q -d -c "$GZ_FILES")
+                FILTRTEXT="$FILTRTEXT $(cat "$FILES")"
+            else
+                FILTRTEXT=$(eval gzip -q -d -c "$GZ_FILES")
+        fi
+  elif [ "$FILES" != "" ]; then
+        FILTRTEXT=$(eval cat "$FILES")
+  else
+        exit 1
+  fi   #nactenitextu i z zipu
 fi   
  
 
-
+echo "$FILTRTEXT"
                                                             
 if [ "$POCETTICKERU" != "0" ]  #FILTRACE TICKERU
 then
